@@ -10,11 +10,18 @@ from supabase import create_client, Client
 from fpdf import FPDF
 
 # Configuração da página
-st.set_page_config(page_title="Quiz: Seu Perfil de Dados", layout="centered")
+st.set_page_config(page_title="Perfil em Dados", layout="centered")
+
+# --- GERENCIAMENTO DE ESTADO ---
+if 'page' not in st.session_state:
+    st.session_state.page = 'home'
+
+def navigate_to(page_name):
+    st.session_state.page = page_name
+    st.rerun()
 
 # --- FUNÇÕES DE VALIDAÇÃO E API ---
 def is_valid_name(name):
-    # Aceita apenas letras (incluindo acentos) e espaços
     return re.match(r"^[A-Za-zÀ-ÿ\s]+$", name) is not None
 
 def is_valid_email(email):
@@ -172,8 +179,46 @@ def generate_pdf(nome, resultado, descricao, recursos_dict, chart_path):
     pdf.output(temp_file.name)
     return temp_file.name
 
-# --- APLICAÇÃO PRINCIPAL ---
-def main():
+
+# --- PÁGINA 1: HOME ---
+def show_home():
+    st.title("Descubra o seu lugar no Ecossistema de Dados")
+    
+    st.write("""
+    O mercado de dados é vasto e repleto de especializações. Compreender onde as suas habilidades atuais se encaixam é o primeiro passo para direcionar os seus estudos e a sua carreira de forma estratégica.
+    """)
+    
+    # Exibir a imagem localizada na pasta img
+    try:
+        st.image("img/tipos_de_profissionais.jpg", use_container_width=True)
+    except FileNotFoundError:
+        st.warning("Imagem 'tipos_de_profissionais.jpg' não encontrada na pasta 'img/'.")
+
+    st.markdown("### Conheça as Áreas de Atuação:")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown(f"**🛠️ Engenheiro de Dados:**\n{role_descriptions['Engenheiro de Dados']}")
+        st.markdown(f"**🤖 Engenheiro de ML:**\n{role_descriptions['Engenheiro de ML']}")
+    with col2:
+        st.markdown(f"**🔬 Cientista de Dados:**\n{role_descriptions['Cientista de Dados']}")
+        st.markdown(f"**📊 Analista de Dados:**\n{role_descriptions['Analista de Dados']}")
+        
+    st.markdown("---")
+    st.write("Pronto para descobrir qual destas áreas tem o maior *match* com o seu perfil atual?")
+    
+    # Botão para alternar o estado para a página do quiz
+    if st.button("Iniciar o Quiz", type="primary"):
+        navigate_to('quiz')
+
+
+# --- PÁGINA 2: QUIZ ---
+def show_quiz():
+    col1, col2 = st.columns([1, 8])
+    with col1:
+        if st.button("⬅ Voltar"):
+            navigate_to('home')
+            
     st.title("Quiz: Qual é o seu Perfil na Área de Dados?")
     st.info("🔒 **Privacidade:** Os dados não serão utilizados para fins comerciais. O objetivo é apenas registo e formar um grupo focado em vagas na área.")
 
@@ -181,12 +226,10 @@ def main():
 
     st.subheader("1. Informações Pessoais")
     
-    # Linha 1: Nome e Sobrenome
     c1, c2 = st.columns(2)
     with c1: nome = st.text_input("Nome*")
     with c2: sobrenome = st.text_input("Sobrenome")
 
-    # Linha 2: País e Estado (Cascata)
     c3, c4 = st.columns(2)
     pais = ""
     estado = ""
@@ -198,7 +241,6 @@ def main():
             idx_brasil = country_names.index("Brazil") if "Brazil" in country_names else 0
             pais = st.selectbox("País", options=country_names, index=idx_brasil)
             
-            # Buscar estados do país selecionado
             states_obj = next((item['states'] for item in countries_data if item['name'] == pais), [])
             state_names = [s['name'] for s in states_obj]
         else:
@@ -210,7 +252,6 @@ def main():
         else:
             estado = st.text_input("Estado / Província")
 
-    # Linha 3: Cidade (Cascata) e Profissão
     c5, c6 = st.columns(2)
     cidade = ""
     with c5:
@@ -225,7 +266,6 @@ def main():
             
     with c6: profissao = st.text_input("Profissão Atual")
 
-    # Linha 4: Email e LinkedIn
     c7, c8 = st.columns(2)
     with c7: email = st.text_input("E-mail*")
     with c8: linkedin = st.text_input("URL do LinkedIn")
@@ -247,7 +287,6 @@ def main():
         user_scores.append(score)
         
     if st.button("Descobrir meu perfil"):
-        # VALIDAÇÕES
         if not nome or not is_valid_name(nome):
             st.error("O campo 'Nome' é obrigatório e deve conter apenas letras e espaços.")
             return
@@ -258,7 +297,6 @@ def main():
             st.error("O link do LinkedIn parece estar incorreto. Ex: https://www.linkedin.com/in/seu-perfil")
             return
 
-        # Calcular Perfil
         distances = {}
         for role, scores in profiles.items():
             dist = np.linalg.norm(np.array(user_scores) - np.array(scores))
@@ -266,7 +304,6 @@ def main():
             
         best_match = min(distances, key=distances.get)
         
-        # Enviar para o Supabase
         try:
             url = st.secrets["SUPABASE_URL"]
             key = st.secrets["SUPABASE_KEY"]
@@ -288,7 +325,6 @@ def main():
             st.warning("Ocorreu um erro ao guardar os dados no Supabase. (Apenas exibindo o resultado)")
             st.error(f"Detalhe técnico: {e}")
             
-        # Apresentação do Resultado
         st.success(f"### O seu perfil ideal é: **{best_match}**")
         st.info(role_descriptions[best_match])
 
@@ -320,5 +356,9 @@ def main():
         os.remove(pdf_path)
         os.remove(chart_img_path)
 
+# --- CONTROLE DE FLUXO PRINCIPAL ---
 if __name__ == "__main__":
-    main()
+    if st.session_state.page == 'home':
+        show_home()
+    elif st.session_state.page == 'quiz':
+        show_quiz()

@@ -307,8 +307,9 @@ def show_quiz():
             
         best_match = min(distances, key=distances.get)
         
-        # Enviar valores separados por ponto e vírgula para o Supabase
-        scores_str = ";".join(map(str, user_scores))
+       # Mesclar o nome da categoria com a nota e separar por ponto e vírgula
+        resultado_formatado = [f"{cat} {nota}" for cat, nota in zip(categories, user_scores)]
+        scores_str = "; ".join(resultado_formatado)
         
         try:
             url = st.secrets["SUPABASE_URL"]

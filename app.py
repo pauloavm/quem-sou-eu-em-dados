@@ -19,6 +19,20 @@ def main():
         'Storytelling', 'Insights de Negócios', 'Experimentação', 'Estatística', 
         'Modelagem de ML', 'Implantação'
     ]
+    
+    # Explicação de cada habilidade para ajudar o usuário
+    skill_descriptions = {
+        'MLOps': 'Práticas para colocar e manter modelos de Machine Learning em produção de forma confiável e escalável.',
+        'Pipelines de Dados': 'Construção e automação de fluxos de extração, transformação e carregamento (ETL) de dados.',
+        'Banco de Dados': 'Modelagem, gestão e consulta (como SQL) em bancos de dados relacionais e não-relacionais.',
+        'Visualização de Dados': 'Criação de gráficos e dashboards (ex: Power BI, Tableau) para ilustrar dados complexos.',
+        'Storytelling': 'Capacidade de comunicar descobertas de forma clara, construindo uma narrativa persuasiva.',
+        'Insights de Negócios': 'Compreensão do mercado para traduzir resultados de dados em ações estratégicas para a empresa.',
+        'Experimentação': 'Planejamento e execução de testes (como Testes A/B) para validar hipóteses de forma rigorosa.',
+        'Estatística': 'Aplicação de métodos de probabilidade, inferência e análise matemática para garantir o rigor dos dados.',
+        'Modelagem de ML': 'Desenvolvimento, treinamento e ajuste de algoritmos preditivos e aprendizado de máquina.',
+        'Implantação': 'Colocação de modelos, scripts ou aplicações no ar (deploy) em servidores ou serviços de nuvem.'
+    }
 
     # Perfis de referência (notas de 1 a 5)
     profiles = {
@@ -28,7 +42,7 @@ def main():
         'Analista de Dados': [1, 2, 4, 5, 5, 5, 3, 3, 1, 1]
     }
 
-    # Descrições de cada perfil fornecidas
+    # Descrições de cada perfil
     role_descriptions = {
         'Engenheiro de Dados': "Mestres em pipelines de dados, bancos de dados e implantação — mantendo o fluxo contínuo dos dados.",
         'Engenheiro de ML': "Focado em modelagem, experimentação e implantação de ML — trazendo o aprendizado de máquina à vida.",
@@ -44,12 +58,15 @@ def main():
         col1, col2 = st.columns(2)
         
         for i, cat in enumerate(categories):
-            if i % 2 == 0:
-                with col1:
-                    score = st.slider(cat, min_value=1, max_value=5, value=3)
-            else:
-                with col2:
-                    score = st.slider(cat, min_value=1, max_value=5, value=3)
+            # Alterna entre a coluna 1 e 2
+            col = col1 if i % 2 == 0 else col2
+            
+            with col:
+                # O slider captura a nota, e o caption exibe a explicação da habilidade logo abaixo
+                score = st.slider(cat, min_value=1, max_value=5, value=3)
+                st.caption(skill_descriptions[cat])
+                st.write("") # Espaçamento extra para não ficar visualmente colado no próximo item
+                
             user_scores.append(score)
             
         submitted = st.form_submit_button("Descobrir meu perfil")
@@ -64,7 +81,6 @@ def main():
         # Determinar o perfil com a menor distância
         best_match = min(distances, key=distances.get)
         
-        # Exibição dos resultados e da explicação
         st.success(f"### O seu perfil ideal é: **{best_match}**")
         st.info(role_descriptions[best_match])
         

@@ -1,4 +1,3 @@
-```markdown
 # Quem sou eu em Dados? 📊
 
 > 🎯 **Sobre o Projeto:** Uma aplicação interativa desenvolvida em Python e Streamlit que avalia as suas competências técnicas e determina o seu perfil ideal no ecossistema de dados (Analista, Cientista, Engenheiro de Dados ou ML Engineer). O sistema gera gráficos de radar dinâmicos, integra-se ao Supabase para armazenamento seguro e exporta relatórios executivos em PDF com recomendações de estudo.
@@ -118,4 +117,3 @@ Profissional de Planejamento Comercial e Data Analytics.
 * **Meu LinkedIn:** [https://www.linkedin.com/in/paulomunhoz/](https://www.linkedin.com/in/paulomunhoz/)
 * **Meu GitHub:** [https://github.com/pauloavm](https://github.com/pauloavm)
 * **Avaliação Gratuita de Seu LinkedIn:** [Formulário de Análise de Perfil](https://forms.gle/eqp8dADTU88bA39p6)
-```

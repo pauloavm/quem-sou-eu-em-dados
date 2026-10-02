@@ -16,6 +16,9 @@ st.set_page_config(page_title="Perfil em Dados", layout="centered")
 if 'page' not in st.session_state:
     st.session_state.page = 'home'
 
+if 'reset_counter' not in st.session_state:
+    st.session_state.reset_counter = 0
+
 def navigate_to(page_name):
     st.session_state.page = page_name
     st.rerun()
@@ -188,7 +191,6 @@ def show_home():
     O mercado de dados é vasto e repleto de especializações. Compreender onde as suas habilidades atuais se encaixam é o primeiro passo para direcionar os seus estudos e a sua carreira de forma estratégica.
     """)
     
-    # Exibir a imagem localizada na pasta img
     try:
         st.image("img/tipos_de_profissionais.jpg", use_container_width=True)
     except FileNotFoundError:
@@ -207,13 +209,14 @@ def show_home():
     st.markdown("---")
     st.write("Pronto para descobrir qual destas áreas tem o maior *match* com o seu perfil atual?")
     
-    # Botão para alternar o estado para a página do quiz
     if st.button("Iniciar o Quiz", type="primary"):
         navigate_to('quiz')
 
 
 # --- PÁGINA 2: QUIZ ---
 def show_quiz():
+    rc = st.session_state.reset_counter # Variável que força a limpeza do formulário
+    
     col1, col2 = st.columns([1, 8])
     with col1:
         if st.button("⬅ Voltar"):
@@ -227,8 +230,8 @@ def show_quiz():
     st.subheader("1. Informações Pessoais")
     
     c1, c2 = st.columns(2)
-    with c1: nome = st.text_input("Nome*")
-    with c2: sobrenome = st.text_input("Sobrenome")
+    with c1: nome = st.text_input("Nome*", key=f"nome_{rc}")
+    with c2: sobrenome = st.text_input("Sobrenome", key=f"sobrenome_{rc}")
 
     c3, c4 = st.columns(2)
     pais = ""
@@ -239,18 +242,18 @@ def show_quiz():
         if countries_data:
             country_names = [item['name'] for item in countries_data]
             idx_brasil = country_names.index("Brazil") if "Brazil" in country_names else 0
-            pais = st.selectbox("País", options=country_names, index=idx_brasil)
+            pais = st.selectbox("País", options=country_names, index=idx_brasil, key=f"pais_sel_{rc}")
             
             states_obj = next((item['states'] for item in countries_data if item['name'] == pais), [])
             state_names = [s['name'] for s in states_obj]
         else:
-            pais = st.text_input("País")
+            pais = st.text_input("País", key=f"pais_txt_{rc}")
 
     with c4:
         if state_names:
-            estado = st.selectbox("Estado / Província", options=state_names)
+            estado = st.selectbox("Estado / Província", options=state_names, key=f"est_sel_{rc}")
         else:
-            estado = st.text_input("Estado / Província")
+            estado = st.text_input("Estado / Província", key=f"est_txt_{rc}")
 
     c5, c6 = st.columns(2)
     cidade = ""
@@ -258,17 +261,17 @@ def show_quiz():
         if pais and estado and state_names:
             cities_data = get_cities(pais, estado)
             if cities_data:
-                cidade = st.selectbox("Cidade", options=cities_data)
+                cidade = st.selectbox("Cidade", options=cities_data, key=f"cid_sel_{rc}")
             else:
-                cidade = st.text_input("Cidade")
+                cidade = st.text_input("Cidade", key=f"cid_txt_{rc}")
         else:
-            cidade = st.text_input("Cidade")
+            cidade = st.text_input("Cidade", key=f"cid_txt_fallback_{rc}")
             
-    with c6: profissao = st.text_input("Profissão Atual")
+    with c6: profissao = st.text_input("Profissão Atual", key=f"prof_{rc}")
 
     c7, c8 = st.columns(2)
-    with c7: email = st.text_input("E-mail*")
-    with c8: linkedin = st.text_input("URL do LinkedIn")
+    with c7: email = st.text_input("E-mail*", key=f"email_{rc}")
+    with c8: linkedin = st.text_input("URL do LinkedIn", key=f"link_{rc}")
 
     st.markdown("---")
     st.subheader("2. Avaliação de Habilidades")
@@ -282,20 +285,20 @@ def show_quiz():
         with col:
             st.markdown(f"**{cat}**")
             st.caption(skill_descriptions[cat])
-            score = st.slider(f"Nota para {cat}", min_value=1, max_value=5, value=3, label_visibility="collapsed")
+            score = st.slider(f"Nota para {cat}", min_value=1, max_value=5, value=3, label_visibility="collapsed", key=f"cat_{i}_{rc}")
             st.write("") 
         user_scores.append(score)
         
     if st.button("Descobrir meu perfil"):
         if not nome or not is_valid_name(nome):
             st.error("O campo 'Nome' é obrigatório e deve conter apenas letras e espaços.")
-            return
+            st.stop()
         if not is_valid_email(email):
             st.error("Por favor, insira um e-mail válido.")
-            return
+            st.stop()
         if linkedin and not is_valid_linkedin(linkedin):
             st.error("O link do LinkedIn parece estar incorreto. Ex: https://www.linkedin.com/in/seu-perfil")
-            return
+            st.stop()
 
         distances = {}
         for role, scores in profiles.items():
@@ -303,6 +306,9 @@ def show_quiz():
             distances[role] = dist
             
         best_match = min(distances, key=distances.get)
+        
+        # Enviar valores separados por ponto e vírgula para o Supabase
+        scores_str = ";".join(map(str, user_scores))
         
         try:
             url = st.secrets["SUPABASE_URL"]
@@ -318,16 +324,14 @@ def show_quiz():
                 "profissao": profissao,
                 "email": email,
                 "linkedin": linkedin,
-                "resultado": best_match
+                "resultado": scores_str
             }
             supabase.table("quiz_results").insert(data).execute()
         except Exception as e:
             st.warning("Ocorreu um erro ao guardar os dados no Supabase. (Apenas exibindo o resultado)")
             st.error(f"Detalhe técnico: {e}")
             
-        st.success(f"### O seu perfil ideal é: **{best_match}**")
-        st.info(role_descriptions[best_match])
-
+        # Geração do Gráfico e PDF em memória para não perder os dados após clicar no botão de download
         cat_loop = categories + [categories[0]]
         user_loop = user_scores + [user_scores[0]]
         match_loop = profiles[best_match] + [profiles[best_match][0]]
@@ -337,24 +341,57 @@ def show_quiz():
         fig.add_trace(go.Scatterpolar(r=match_loop, theta=cat_loop, fill='toself', name=best_match, line_color='rgba(92, 157, 222, 0.8)'))
         fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 5])), showlegend=True, margin=dict(l=40, r=40, t=40, b=40))
         
-        st.plotly_chart(fig, width='stretch')
-        
         with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_img:
             fig.write_image(tmp_img.name, width=600, height=500)
             chart_img_path = tmp_img.name
         
         pdf_path = generate_pdf(nome, best_match, role_descriptions[best_match], learning_resources[best_match], chart_img_path)
         
-        with open(pdf_path, "rb") as file:
-            st.download_button(
-                label="📄 Baixar Relatório Completo (PDF)",
-                data=file,
-                file_name=f"Resultado_Perfil_Dados_{nome}.pdf",
-                mime="application/pdf"
-            )
+        with open(pdf_path, "rb") as f:
+            pdf_bytes = f.read()
             
         os.remove(pdf_path)
-        os.remove(chart_img_path)
+        # os.remove(chart_img_path) # Comentado conforme solicitado - Não exclui o gráfico
+        
+        # Salva as informações da sessão para garantir que sobrevivem ao refresh da página
+        st.session_state.best_match = best_match
+        st.session_state.user_scores = user_scores
+        st.session_state.nome_relatorio = nome
+        st.session_state.pdf_bytes = pdf_bytes
+        st.session_state.submitted_rc = rc
+
+    # Renderização da Área de Resultado e Botões Finais
+    if st.session_state.get('submitted_rc') == rc:
+        best_match = st.session_state.best_match
+        st.success(f"### O seu perfil ideal é: **{best_match}**")
+        st.info(role_descriptions[best_match])
+
+        # Recriar gráfico para a visualização na web
+        cat_loop = categories + [categories[0]]
+        user_loop = st.session_state.user_scores + [st.session_state.user_scores[0]]
+        match_loop = profiles[best_match] + [profiles[best_match][0]]
+
+        fig = go.Figure()
+        fig.add_trace(go.Scatterpolar(r=user_loop, theta=cat_loop, fill='toself', name='Você', line_color='rgba(136, 136, 136, 0.8)'))
+        fig.add_trace(go.Scatterpolar(r=match_loop, theta=cat_loop, fill='toself', name=best_match, line_color='rgba(92, 157, 222, 0.8)'))
+        fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 5])), showlegend=True, margin=dict(l=40, r=40, t=40, b=40))
+        
+        st.plotly_chart(fig, width='stretch')
+        
+        col_dl, col_reset = st.columns(2)
+        with col_dl:
+            st.download_button(
+                label="📄 Baixar Relatório (PDF)",
+                data=st.session_state.pdf_bytes,
+                file_name=f"Resultado_Perfil_Dados_{st.session_state.nome_relatorio}.pdf",
+                mime="application/pdf",
+                use_container_width=True
+            )
+        
+        with col_reset:
+            if st.button("🔄 Limpar e Refazer o Teste", type="primary", use_container_width=True):
+                st.session_state.reset_counter += 1
+                st.rerun()
 
 # --- CONTROLE DE FLUXO PRINCIPAL ---
 if __name__ == "__main__":

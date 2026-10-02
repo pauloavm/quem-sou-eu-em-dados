@@ -1,8 +1,8 @@
 # Quem sou eu em Dados? 📊
 
-> 🎯 **Sobre o Projeto:** Uma aplicação interativa desenvolvida em Python e Streamlit que avalia as suas competências técnicas e determina o seu perfil ideal no ecossistema de dados (Analista, Cientista, Engenheiro de Dados ou ML Engineer). O sistema gera gráficos de radar dinâmicos, integra-se ao Supabase para armazenamento seguro e exporta relatórios executivos em PDF com recomendações de estudo.
+> **Sobre o Projeto:** Uma aplicação interativa desenvolvida em Python e Streamlit que avalia as suas competências técnicas e determina o seu perfil ideal no ecossistema de dados (Analista, Cientista, Engenheiro de Dados ou ML Engineer). O sistema gera gráficos de radar dinâmicos, integra-se ao Supabase para armazenamento seguro e exporta relatórios executivos em PDF com recomendações de estudo.
 
-## 🚀 Funcionalidades
+## Funcionalidades
 
 *   **Avaliação de Habilidades:** Formulário dinâmico com 10 competências essenciais do mercado de dados.
 *   **Seleção em Cascata:** Integração com API externa para seleção precisa de País > Estado > Cidade.
@@ -11,7 +11,7 @@
 *   **Exportação de Relatório (PDF):** Geração de um documento executivo formatado com os resultados, gráfico integrado e hiperligações para recursos de estudo gratuitos.
 *   **Armazenamento em Nuvem:** Integração direta com o banco de dados Supabase para registro contínuo dos resultados.
 
-## 🛠️ Tecnologias Utilizadas
+## Tecnologias Utilizadas
 
 *   **Linguagem:** Python 3.13
 *   **Framework Web:** Streamlit
@@ -20,14 +20,14 @@
 *   **Banco de Dados:** Supabase (PostgreSQL)
 *   **Integrações:** API CountriesNow (Geolocalização)
 
-## 📂 Estrutura do Repositório
+## Estrutura do Repositório
 
 O projeto possui uma estrutura minimalista e direta:
 *   `app.py`: Código-fonte principal contendo a interface, lógica de cálculo e geração do PDF.
 *   `requirements.txt`: Lista de dependências do Python necessárias para rodar o projeto.
 *   `.gitignore`: Arquivo de exclusão para evitar o versionamento de pastas locais (como `venv/`) e credenciais sensíveis.
 
-## 💻 Como Executar Localmente (Passo a Passo)
+## Como Executar Localmente (Passo a Passo)
 
 Siga estas instruções para rodar o projeto na sua própria máquina.
 
@@ -99,20 +99,20 @@ streamlit run app.py
 
 O seu navegador abrirá automaticamente uma nova aba no endereço `http://localhost:8501` com a aplicação a funcionar.
 
-## ☁️ Deploy no Streamlit Community Cloud
+## Deploy no Streamlit Community Cloud
 
 Para publicar a sua aplicação gratuitamente na internet:
 
 1. Envie o seu código atualizado para o repositório principal no GitHub.
-2. Aceda ao [Streamlit Community Cloud](https://share.streamlit.io/) e faça login.
+2. Acesse o [Streamlit Community Cloud](https://share.streamlit.io/) e faça login.
 3. Clique em **"New app"**, selecione este repositório, a *branch* principal e o arquivo `app.py`.
-4. Antes de clicar em Deploy, aceda a **"Advanced settings"** (ou na aba **Secrets** após a criação) e cole o conteúdo do seu ficheiro `secrets.toml`.
+4. Antes de clicar em Deploy, vá em **"Advanced settings"** (ou na aba **Secrets** após a criação) e cole o conteúdo do seu ficheiro `secrets.toml`.
 5. Clique em **Deploy**.
 
-## 📞 Autor
+## Autor
 
-**Paulo Augusto Venelli Munhoz**
-Profissional de Planejamento Comercial e Data Analytics.
+**Paulo Munhoz**
+Profissional de Analis de Dados, BI, Planejamento Comercial e Data Analytics.
 
 * **Meu LinkedIn:** [https://www.linkedin.com/in/paulomunhoz/](https://www.linkedin.com/in/paulomunhoz/)
 * **Meu GitHub:** [https://github.com/pauloavm](https://github.com/pauloavm)

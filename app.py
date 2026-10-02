@@ -1,57 +1,49 @@
 import streamlit as st
 import plotly.graph_objects as go
 import numpy as np
-from supabase import create_client, Client
-from fpdf import FPDF
+import requests
+import re
 import tempfile
 import os
-import re
-import requests
+import unicodedata
+from supabase import create_client, Client
+from fpdf import FPDF
 
 # Configuração da página
 st.set_page_config(page_title="Quiz: Seu Perfil de Dados", layout="centered")
 
-# --- FUNÇÕES DE VALIDAÇÃO ---
-def is_valid_text(text):
-    # Permite letras, espaços e acentos. Rejeita números avulsos ou símbolos absurdos. Mínimo 2 caracteres.
-    if not text: return False
-    return bool(re.match(r"^[A-Za-zÀ-ÿ\s]{2,}$", text.strip()))
+# --- FUNÇÕES DE VALIDAÇÃO E API ---
+def is_valid_name(name):
+    # Aceita apenas letras (incluindo acentos) e espaços
+    return re.match(r"^[A-Za-zÀ-ÿ\s]+$", name) is not None
 
 def is_valid_email(email):
-    if not email: return False
-    return bool(re.match(r"^[\w\.-]+@[\w\.-]+\.\w+$", email.strip()))
+    return re.match(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$", email) is not None
 
 def is_valid_linkedin(url):
-    if not url: return False
-    return bool(re.match(r"^(https?:\/\/)?([\w]+\.)?linkedin\.com\/.*$", url.strip()))
+    return "linkedin.com/in/" in url.lower()
 
-# --- FUNÇÕES DE BUSCA DE LOCALIZAÇÃO (COM CACHE PARA NÃO FICAR LENTO) ---
-@st.cache_data(ttl=86400) # Cache de 1 dia
-def get_countries():
-    try:
-        r = requests.get("https://countriesnow.space/api/v0.1/countries")
-        if r.status_code == 200:
-            return sorted([country['country'] for country in r.json()['data']])
-    except:
-        pass
-    return ["Brasil", "Portugal", "Estados Unidos"] # Fallback básico
+def remove_accents(input_str):
+    nfkd_form = unicodedata.normalize('NFKD', input_str)
+    return u"".join([c for c in nfkd_form if not unicodedata.combining(c)])
 
-@st.cache_data(ttl=86400)
-def get_states(country):
+@st.cache_data(ttl=3600)
+def get_countries_and_states():
     try:
-        r = requests.post("https://countriesnow.space/api/v0.1/countries/states", json={"country": country})
+        r = requests.get("https://countriesnow.space/api/v0.1/countries/states", timeout=5)
         if r.status_code == 200:
-            return sorted([state['name'] for state in r.json()['data']['states']])
+            return r.json().get('data', [])
     except:
         pass
     return []
 
-@st.cache_data(ttl=86400)
+@st.cache_data(ttl=3600)
 def get_cities(country, state):
     try:
-        r = requests.post("https://countriesnow.space/api/v0.1/countries/state/cities", json={"country": country, "state": state})
+        r = requests.post("https://countriesnow.space/api/v0.1/countries/state/cities", 
+                          json={"country": country, "state": state}, timeout=5)
         if r.status_code == 200:
-            return sorted(r.json()['data'])
+            return r.json().get('data', [])
     except:
         pass
     return []
@@ -91,42 +83,90 @@ role_descriptions = {
 }
 
 learning_resources = {
-    'Engenheiro de Dados': "Cursos gratuitos em: Data Engineering Zoomcamp (DataTalks.Club), Microsoft Learn (Azure Data), e tutoriais de Apache Airflow/Spark no YouTube.",
-    'Engenheiro de ML': "Cursos gratuitos em: Machine Learning Crash Course (Google), Fast.ai (Practical Deep Learning), e MLOps Zoomcamp.",
-    'Cientista de Dados': "Cursos gratuitos em: Kaggle Micro-courses, CS229 (Stanford/YouTube), e documentação do Scikit-Learn.",
-    'Analista de Dados': "Cursos gratuitos em: Google Data Analytics (auditoria no Coursera), FreeCodeCamp (Data Analysis with Python), e SQLZoo."
+    'Engenheiro de Dados': {
+        'Data Engineering Zoomcamp': 'https://github.com/DataTalksClub/data-engineering-zoomcamp',
+        'Microsoft Learn - Azure Data Fundamentals': 'https://learn.microsoft.com/pt-br/training/azure/',
+        'Documentacao Oficial do Apache Airflow': 'https://airflow.apache.org/docs/'
+    },
+    'Engenheiro de ML': {
+        'Machine Learning Crash Course (Google)': 'https://developers.google.com/machine-learning/crash-course',
+        'Fast.ai - Practical Deep Learning': 'https://course.fast.ai/',
+        'MLOps Zoomcamp': 'https://github.com/DataTalksClub/mlops-zoomcamp'
+    },
+    'Cientista de Dados': {
+        'Kaggle Micro-courses (Gratuitos e Praticos)': 'https://www.kaggle.com/learn',
+        'CS229 Machine Learning (Stanford)': 'https://cs229.stanford.edu/',
+        'Scikit-Learn Tutoriais e Exemplos': 'https://scikit-learn.org/stable/tutorial/index.html'
+    },
+    'Analista de Dados': {
+        'Google Data Analytics (Auditavel no Coursera)': 'https://www.coursera.org/professional-certificates/google-data-analytics',
+        'FreeCodeCamp - Data Analysis with Python': 'https://www.freecodecamp.org/learn/data-analysis-with-python/',
+        'SQLZoo (Pratica Interativa de SQL)': 'https://sqlzoo.net/'
+    }
 }
 
-# --- FUNÇÃO PARA GERAR PDF ---
+# --- CLASSE PARA GERAR O PDF APRIMORADO ---
 class PDFReport(FPDF):
     def footer(self):
-        self.set_y(-15)
-        self.set_font("Arial", "I", 10)
-        self.cell(0, 10, "Conecte-se com o criador no LinkedIn: linkedin.com/in/paulo-augusto-venelli-munhoz", 0, 0, "C")
+        self.set_y(-25) 
+        self.set_draw_color(200, 200, 200)
+        self.line(10, self.get_y(), 200, self.get_y())
+        self.set_y(-20)
+        self.set_font("Arial", "I", 9)
+        self.set_text_color(100, 100, 100)
+        self.cell(0, 5, remove_accents("Desenvolvido por Paulo Munhoz"), ln=True, align="C")
+        self.set_text_color(0, 102, 204)
+        self.set_font("Arial", "U", 9)
+        self.cell(0, 5, "LinkedIn", link="https://www.linkedin.com/in/paulomunhoz/", align="C", ln=True)
+        self.cell(0, 5, "GitHub", link="https://github.com/pauloavm", align="C", ln=True)
 
-def generate_pdf(nome, resultado, descricao, recursos):
+def generate_pdf(nome, resultado, descricao, recursos_dict, chart_path):
     pdf = PDFReport()
     pdf.add_page()
     
-    pdf.set_font("Arial", "B", 16)
-    pdf.cell(0, 10, "Relatorio de Perfil: Profissional de Dados", ln=True, align="C")
-    pdf.ln(10)
-    
-    pdf.set_font("Arial", "", 12)
-    pdf.cell(0, 10, f"Ola, {nome}.", ln=True)
-    pdf.cell(0, 10, f"O seu perfil ideal calculado e: {resultado}", ln=True)
+    pdf.set_font("Arial", "B", 18)
+    pdf.set_text_color(44, 62, 80)
+    pdf.cell(0, 12, remove_accents("Relatório de Avaliação: Perfil em Dados"), ln=True, align="C")
     pdf.ln(5)
     
-    pdf.set_font("Arial", "B", 12)
-    pdf.cell(0, 10, "Sobre a sua area de atuacao:", ln=True)
     pdf.set_font("Arial", "", 12)
-    pdf.multi_cell(0, 8, descricao.replace("—", "-"))
-    pdf.ln(10)
+    pdf.set_text_color(0, 0, 0)
+    pdf.write(8, remove_accents(f"Olá, {nome}. Com base nas suas habilidades, o seu perfil tem forte alinhamento com: "))
+    pdf.set_font("Arial", "B", 14)
+    pdf.set_text_color(41, 128, 185)
+    pdf.write(8, remove_accents(f"{resultado}"))
+    pdf.ln(12)
+    
+    pdf.set_font("Arial", "", 11)
+    pdf.set_text_color(50, 50, 50)
+    pdf.multi_cell(0, 6, remove_accents(descricao.replace("—", "-")))
+    pdf.ln(5)
+    
+    pdf.image(chart_path, x=45, w=120)
+    pdf.ln(2)
     
     pdf.set_font("Arial", "B", 12)
-    pdf.cell(0, 10, "Onde aprimorar os seus conhecimentos gratuitamente:", ln=True)
-    pdf.set_font("Arial", "", 12)
-    pdf.multi_cell(0, 8, recursos)
+    pdf.set_text_color(44, 62, 80)
+    pdf.cell(0, 10, remove_accents("Recursos Recomendados para Estudo (Clique para acessar):"), ln=True)
+    
+    pdf.set_font("Arial", "U", 11)
+    pdf.set_text_color(0, 102, 204) 
+    for curso, url in recursos_dict.items():
+        pdf.set_font("Arial", "", 11)
+        pdf.set_text_color(0, 0, 0)
+        pdf.write(8, "  -  ")
+        pdf.set_font("Arial", "U", 11)
+        pdf.set_text_color(0, 102, 204)
+        pdf.write(8, remove_accents(curso), link=url)
+        pdf.ln(8)
+        
+    pdf.ln(8)
+    
+    pdf.set_font("Arial", "B", 12)
+    pdf.set_fill_color(39, 174, 96) 
+    pdf.set_text_color(255, 255, 255) 
+    cta_text = remove_accents(" Quer se destacar? Clique aqui para uma Avaliação Gratuita do seu LinkedIn! ")
+    pdf.cell(0, 12, cta_text, ln=True, align="C", fill=True, link="https://forms.gle/eqp8dADTU88bA39p6")
     
     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
     pdf.output(temp_file.name)
@@ -135,61 +175,70 @@ def generate_pdf(nome, resultado, descricao, recursos):
 # --- APLICAÇÃO PRINCIPAL ---
 def main():
     st.title("Quiz: Qual é o seu Perfil na Área de Dados?")
-    st.info("🔒 **Privacidade dos Dados:** As informações recolhidas não serão utilizadas para fins comerciais. O objetivo é apenas registo e a formação de um futuro grupo focado em vagas na área de dados.")
+    st.info("🔒 **Privacidade:** Os dados não serão utilizados para fins comerciais. O objetivo é apenas registo e formar um grupo focado em vagas na área.")
 
-    # 1. Informações Pessoais (Sem st.form para permitir atualização dinâmica dos selects)
+    countries_data = get_countries_and_states()
+
     st.subheader("1. Informações Pessoais")
     
+    # Linha 1: Nome e Sobrenome
     c1, c2 = st.columns(2)
-    with c1:
-        nome = st.text_input("Nome*")
-        email = st.text_input("E-mail*")
-        profissao = st.text_input("Profissão Atual*")
-    with c2:
-        sobrenome = st.text_input("Sobrenome*")
-        linkedin = st.text_input("URL do LinkedIn*")
-    
-    st.markdown("**Localização**")
-    c_loc1, c_loc2, c_loc3 = st.columns(3)
-    
-    # Lógica em cascata para País -> Estado -> Cidade
-    with c_loc1:
-        paises_lista = [""] + get_countries()
-        pais = st.selectbox("País*", options=paises_lista)
-    
+    with c1: nome = st.text_input("Nome*")
+    with c2: sobrenome = st.text_input("Sobrenome")
+
+    # Linha 2: País e Estado (Cascata)
+    c3, c4 = st.columns(2)
+    pais = ""
     estado = ""
-    cidade = ""
-    with c_loc2:
-        if pais:
-            estados_lista = get_states(pais)
-            if estados_lista:
-                estado = st.selectbox("Estado/Província*", options=[""] + estados_lista)
-            else:
-                estado = st.text_input("Estado/Província*") # Fallback se API falhar ou não tiver estados
-        else:
-            st.selectbox("Estado/Província*", options=["Selecione o País primeiro"], disabled=True)
+    state_names = []
+    
+    with c3:
+        if countries_data:
+            country_names = [item['name'] for item in countries_data]
+            idx_brasil = country_names.index("Brazil") if "Brazil" in country_names else 0
+            pais = st.selectbox("País", options=country_names, index=idx_brasil)
             
-    with c_loc3:
-        if estado and pais:
-            cidades_lista = get_cities(pais, estado)
-            if cidades_lista:
-                cidade = st.selectbox("Cidade*", options=[""] + cidades_lista)
-            else:
-                cidade = st.text_input("Cidade*") # Fallback se API falhar ou não tiver cidades
+            # Buscar estados do país selecionado
+            states_obj = next((item['states'] for item in countries_data if item['name'] == pais), [])
+            state_names = [s['name'] for s in states_obj]
         else:
-             st.selectbox("Cidade*", options=["Selecione o Estado primeiro"], disabled=True)
+            pais = st.text_input("País")
+
+    with c4:
+        if state_names:
+            estado = st.selectbox("Estado / Província", options=state_names)
+        else:
+            estado = st.text_input("Estado / Província")
+
+    # Linha 3: Cidade (Cascata) e Profissão
+    c5, c6 = st.columns(2)
+    cidade = ""
+    with c5:
+        if pais and estado and state_names:
+            cities_data = get_cities(pais, estado)
+            if cities_data:
+                cidade = st.selectbox("Cidade", options=cities_data)
+            else:
+                cidade = st.text_input("Cidade")
+        else:
+            cidade = st.text_input("Cidade")
+            
+    with c6: profissao = st.text_input("Profissão Atual")
+
+    # Linha 4: Email e LinkedIn
+    c7, c8 = st.columns(2)
+    with c7: email = st.text_input("E-mail*")
+    with c8: linkedin = st.text_input("URL do LinkedIn")
 
     st.markdown("---")
-    
-    # 2. Avaliação de Habilidades
     st.subheader("2. Avaliação de Habilidades")
     st.write("Atribua uma nota de 1 (Iniciante) a 5 (Especialista).")
     
     user_scores = []
-    c3, c4 = st.columns(2)
+    c9, c10 = st.columns(2)
     
     for i, cat in enumerate(categories):
-        col = c3 if i % 2 == 0 else c4
+        col = c9 if i % 2 == 0 else c10
         with col:
             st.markdown(f"**{cat}**")
             st.caption(skill_descriptions[cat])
@@ -197,81 +246,79 @@ def main():
             st.write("") 
         user_scores.append(score)
         
-    # O botão de envio fica fora do form
-    if st.button("Descobrir meu perfil", type="primary"):
-        # Validação Robusta
-        erros = []
-        if not is_valid_text(nome): erros.append("O 'Nome' inserido é inválido ou muito curto.")
-        if not is_valid_text(sobrenome): erros.append("O 'Sobrenome' inserido é inválido.")
-        if not is_valid_text(profissao): erros.append("A 'Profissão' inserida contém caracteres inválidos.")
-        if not is_valid_email(email): erros.append("O formato do 'E-mail' é inválido.")
-        if not is_valid_linkedin(linkedin): erros.append("O link do 'LinkedIn' é inválido (deve conter linkedin.com).")
-        if not pais: erros.append("Selecione um País.")
-        if not estado or estado == "Selecione o País primeiro": erros.append("Informe o Estado.")
-        if not cidade or cidade == "Selecione o Estado primeiro": erros.append("Informe a Cidade.")
+    if st.button("Descobrir meu perfil"):
+        # VALIDAÇÕES
+        if not nome or not is_valid_name(nome):
+            st.error("O campo 'Nome' é obrigatório e deve conter apenas letras e espaços.")
+            return
+        if not is_valid_email(email):
+            st.error("Por favor, insira um e-mail válido.")
+            return
+        if linkedin and not is_valid_linkedin(linkedin):
+            st.error("O link do LinkedIn parece estar incorreto. Ex: https://www.linkedin.com/in/seu-perfil")
+            return
 
-        if erros:
-            st.error("Corrija os seguintes erros antes de continuar:")
-            for erro in erros:
-                st.warning(erro)
-        else:
-            # Calcular Perfil
-            distances = {}
-            for role, scores in profiles.items():
-                dist = np.linalg.norm(np.array(user_scores) - np.array(scores))
-                distances[role] = dist
-                
-            best_match = min(distances, key=distances.get)
+        # Calcular Perfil
+        distances = {}
+        for role, scores in profiles.items():
+            dist = np.linalg.norm(np.array(user_scores) - np.array(scores))
+            distances[role] = dist
             
-            # Enviar para o Supabase
-            try:
-                url = st.secrets["SUPABASE_URL"]
-                key = st.secrets["SUPABASE_KEY"]
-                supabase: Client = create_client(url, key)
-                
-                data = {
-                    "nome": nome.strip(),
-                    "sobrenome": sobrenome.strip(),
-                    "pais": pais,
-                    "estado": estado,
-                    "cidade": cidade,
-                    "profissao": profissao.strip(),
-                    "email": email.strip(),
-                    "linkedin": linkedin.strip(),
-                    "resultado": best_match
-                }
-                supabase.table("quiz_results").insert(data).execute()
-            except Exception as e:
-                st.warning("Ocorreu um erro ao guardar os dados no Supabase. (Apenas exibindo o resultado)")
-                st.error(f"Detalhe técnico do erro: {e}")  # Isto vai imprimir o erro exato na tela em vermelho
-            # Apresentação do Resultado
-            st.success(f"### O seu perfil ideal é: **{best_match}**")
-            st.info(role_descriptions[best_match])
+        best_match = min(distances, key=distances.get)
+        
+        # Enviar para o Supabase
+        try:
+            url = st.secrets["SUPABASE_URL"]
+            key = st.secrets["SUPABASE_KEY"]
+            supabase: Client = create_client(url, key)
             
-            st.write("Abaixo está a comparação visual entre as suas habilidades e o perfil recomendado.")
+            data = {
+                "nome": nome,
+                "sobrenome": sobrenome,
+                "pais": pais,
+                "estado": estado,
+                "cidade": cidade,
+                "profissao": profissao,
+                "email": email,
+                "linkedin": linkedin,
+                "resultado": best_match
+            }
+            supabase.table("quiz_results").insert(data).execute()
+        except Exception as e:
+            st.warning("Ocorreu um erro ao guardar os dados no Supabase. (Apenas exibindo o resultado)")
+            st.error(f"Detalhe técnico: {e}")
+            
+        # Apresentação do Resultado
+        st.success(f"### O seu perfil ideal é: **{best_match}**")
+        st.info(role_descriptions[best_match])
 
-            cat_loop = categories + [categories[0]]
-            user_loop = user_scores + [user_scores[0]]
-            match_loop = profiles[best_match] + [profiles[best_match][0]]
+        cat_loop = categories + [categories[0]]
+        user_loop = user_scores + [user_scores[0]]
+        match_loop = profiles[best_match] + [profiles[best_match][0]]
 
-            fig = go.Figure()
-            fig.add_trace(go.Scatterpolar(r=user_loop, theta=cat_loop, fill='toself', name='Você', line_color='rgba(136, 136, 136, 0.8)'))
-            fig.add_trace(go.Scatterpolar(r=match_loop, theta=cat_loop, fill='toself', name=best_match, line_color='rgba(92, 157, 222, 0.8)'))
-            fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 5])), showlegend=True, margin=dict(l=40, r=40, t=40, b=40))
-            st.plotly_chart(fig, width='stretch')
+        fig = go.Figure()
+        fig.add_trace(go.Scatterpolar(r=user_loop, theta=cat_loop, fill='toself', name='Você', line_color='rgba(136, 136, 136, 0.8)'))
+        fig.add_trace(go.Scatterpolar(r=match_loop, theta=cat_loop, fill='toself', name=best_match, line_color='rgba(92, 157, 222, 0.8)'))
+        fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 5])), showlegend=True, margin=dict(l=40, r=40, t=40, b=40))
+        
+        st.plotly_chart(fig, width='stretch')
+        
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_img:
+            fig.write_image(tmp_img.name, width=600, height=500)
+            chart_img_path = tmp_img.name
+        
+        pdf_path = generate_pdf(nome, best_match, role_descriptions[best_match], learning_resources[best_match], chart_img_path)
+        
+        with open(pdf_path, "rb") as file:
+            st.download_button(
+                label="📄 Baixar Relatório Completo (PDF)",
+                data=file,
+                file_name=f"Resultado_Perfil_Dados_{nome}.pdf",
+                mime="application/pdf"
+            )
             
-            # Gerar e disponibilizar o PDF
-            pdf_path = generate_pdf(nome, best_match, role_descriptions[best_match], learning_resources[best_match])
-            
-            with open(pdf_path, "rb") as file:
-                st.download_button(
-                    label="📄 Baixar Relatório (PDF)",
-                    data=file,
-                    file_name=f"Resultado_Perfil_Dados_{nome}.pdf",
-                    mime="application/pdf"
-                )
-                
-            os.remove(pdf_path)
+        os.remove(pdf_path)
+        os.remove(chart_img_path)
 
 if __name__ == "__main__":
     main()

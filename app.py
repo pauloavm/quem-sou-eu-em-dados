@@ -20,7 +20,7 @@ def main():
         'Modelagem de ML', 'Implantação'
     ]
     
-    # Explicação de cada habilidade para ajudar o usuário
+    # Explicação de cada habilidade
     skill_descriptions = {
         'MLOps': 'Práticas para colocar e manter modelos de Machine Learning em produção de forma confiável e escalável.',
         'Pipelines de Dados': 'Construção e automação de fluxos de extração, transformação e carregamento (ETL) de dados.',
@@ -58,14 +58,25 @@ def main():
         col1, col2 = st.columns(2)
         
         for i, cat in enumerate(categories):
-            # Alterna entre a coluna 1 e 2
             col = col1 if i % 2 == 0 else col2
             
             with col:
-                # O slider captura a nota, e o caption exibe a explicação da habilidade logo abaixo
-                score = st.slider(cat, min_value=1, max_value=5, value=3)
+                # 1. Habilidade (em negrito)
+                st.markdown(f"**{cat}**")
+                
+                # 2. Explicação (em texto menor/cinza)
                 st.caption(skill_descriptions[cat])
-                st.write("") # Espaçamento extra para não ficar visualmente colado no próximo item
+                
+                # 3. Régua (com o título padrão oculto para manter a ordem solicitada)
+                score = st.slider(
+                    f"Nota para {cat}", 
+                    min_value=1, 
+                    max_value=5, 
+                    value=3, 
+                    label_visibility="collapsed"
+                )
+                
+                st.write("") # Espaçamento para o próximo item
                 
             user_scores.append(score)
             
@@ -86,7 +97,7 @@ def main():
         
         st.write("Abaixo está a comparação visual entre as suas habilidades e o perfil recomendado.")
 
-        # Preparar dados para o gráfico de radar (fechar o ciclo)
+        # Preparar dados para o gráfico de radar
         cat_loop = categories + [categories[0]]
         user_loop = user_scores + [user_scores[0]]
         match_loop = profiles[best_match] + [profiles[best_match][0]]

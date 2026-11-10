@@ -2,6 +2,10 @@
 
 🌐 **Demo online:** [https://meuperfildedados.streamlit.app/](https://meuperfildedados.streamlit.app/)
 
+![Página inicial](docs/img/landing.png)
+
+![Quiz de habilidades](docs/img/quiz.png)
+
 > **Sobre o Projeto:** Uma aplicação interativa desenvolvida em Python e Streamlit que avalia as suas competências técnicas e determina o seu perfil ideal no ecossistema de dados (Analista, Cientista, Engenheiro de Dados ou ML Engineer). O sistema gera gráficos de radar dinâmicos, integra-se ao Supabase para armazenamento seguro e exporta relatórios executivos em PDF com recomendações de estudo.
 
 ## Funcionalidades
